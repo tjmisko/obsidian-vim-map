@@ -38,6 +38,12 @@ export const LNG_LIMITS = [-180, 180];
 export const MAX_QUERY_SUGGESTIONS = 20;
 export const MAX_EXTERNAL_SEARCH_SUGGESTIONS = 5;
 export const MAX_MARKER_SUGGESTIONS = 5;
+/**
+ * How many vault places the "Go to" modal lists. Larger than
+ * MAX_MARKER_SUGGESTIONS because that list is a scrollable, keyboard-navigable
+ * one rather than a handful of inline suggestions.
+ */
+export const MAX_PLACE_SUGGESTIONS = 50;
 export const MAX_ZOOM = 25;
 export const DEFAULT_MAX_TILE_ZOOM = 19;
 export const MIN_REAL_TIME_LOCATION_ZOOM = 13;
