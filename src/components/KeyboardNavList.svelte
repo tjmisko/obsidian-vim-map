@@ -1,12 +1,17 @@
 <script lang="ts">
     import { onMount, tick } from 'svelte';
+    import { fuzzyMatch } from '../placeSearch';
 
     // A reusable keyboard-navigable, fuzzy-filtered list for the map's modal
-    // keyboard commands (Layers, Presets, ...). It renders a filter input over a
-    // numbered list of rows. Digits 1-9 are *shortcuts* to the Nth visible row
-    // (they never enter the filter text); arrows move the highlight; Enter
-    // chooses the highlighted row; Escape closes. When `stayOpen` is false the
-    // list closes after a choice (selection); when true it stays open (toggling).
+    // keyboard commands (Layers, Presets, Go to, ...). It renders a filter input
+    // over a numbered list of rows. Arrows move the highlight; Enter chooses the
+    // highlighted row; Escape closes. When `stayOpen` is false the list closes
+    // after a choice (selection); when true it stays open (toggling).
+    //
+    // Digit shortcuts are configurable (`digitShortcuts`): 'plain' means 1-9
+    // jump to the Nth visible row and never enter the filter text, 'alt' moves
+    // that to Alt+1-9 so plain digits stay typable (place names contain them),
+    // and 'none' disables them.
 
     export type NavItem = {
         /** Stable identity (used for the {#each} key). */
@@ -17,7 +22,14 @@
         sublabel?: string;
         /** When `showActiveState`, renders an on/off indicator from this. */
         active?: boolean;
+        /**
+         * Optional group header. A non-selectable header row is rendered above
+         * the first visible item of each run of rows sharing a section.
+         */
+        section?: string;
     };
+
+    export type DigitShortcuts = 'plain' | 'alt' | 'none';
 
     let {
         items,
@@ -25,6 +37,10 @@
         stayOpen = false,
         showActiveState = false,
         emptyText = 'No matches',
+        digitShortcuts = 'plain' as DigitShortcuts,
+        filterItems = true,
+        statusText = '',
+        query = $bindable(''),
         onSelect,
         close,
     } = $props<{
@@ -33,28 +49,28 @@
         stayOpen?: boolean;
         showActiveState?: boolean;
         emptyText?: string;
-        onSelect: (item: NavItem, index: number) => void;
+        /** Where the 1-9 row shortcuts live. Defaults to plain digits. */
+        digitShortcuts?: DigitShortcuts;
+        /** Set false when the parent already filtered `items` itself. */
+        filterItems?: boolean;
+        /** Muted line under the rows (e.g. an async search's progress). */
+        statusText?: string;
+        /** The filter text; bindable so a parent can react to what's typed. */
+        query?: string;
+        onSelect: (
+            item: NavItem,
+            index: number,
+            event?: KeyboardEvent | MouseEvent,
+        ) => void;
         close: () => void;
     }>();
 
-    let query = $state('');
     let highlight = $state(0);
     let inputEl: HTMLInputElement = $state();
-
-    // Case-insensitive subsequence ("fuzzy") match — the same lightweight
-    // approach used by the codebase's other suggesters.
-    function fuzzyMatch(needle: string, haystack: string): boolean {
-        if (needle.length === 0) return true;
-        let i = 0;
-        for (const ch of haystack) {
-            if (ch === needle[i]) i++;
-            if (i === needle.length) return true;
-        }
-        return false;
-    }
+    let rowsEl: HTMLElement = $state();
 
     const filtered = $derived(
-        query.trim().length === 0
+        !filterItems || query.trim().length === 0
             ? items
             : items.filter((it) =>
                   fuzzyMatch(
@@ -64,10 +80,27 @@
               ),
     );
 
+    // The header text to render above row `i`, or null when it continues the
+    // previous row's section.
+    function sectionHeaderAt(index: number): string | null {
+        const section = filtered[index]?.section;
+        if (!section) return null;
+        if (index > 0 && filtered[index - 1]?.section === section) return null;
+        return section;
+    }
+
     // Keep the highlight index in range as the filtered list shrinks/grows.
     $effect(() => {
         if (highlight > filtered.length - 1)
             highlight = Math.max(0, filtered.length - 1);
+    });
+
+    // The rows area scrolls (max-height), so keep the highlighted row visible
+    // when the keyboard moves it past either edge.
+    $effect(() => {
+        highlight;
+        const row = rowsEl?.querySelector('.mv-kbd-row.is-highlight');
+        (row as HTMLElement | null)?.scrollIntoView({ block: 'nearest' });
     });
 
     onMount(async () => {
@@ -75,11 +108,28 @@
         inputEl?.focus();
     });
 
-    function choose(index: number) {
+    function choose(index: number, event?: KeyboardEvent | MouseEvent) {
         const item = filtered[index];
         if (!item) return;
-        onSelect(item, index);
+        onSelect(item, index, event);
         if (!stayOpen) close();
+    }
+
+    /**
+     * The 1-9 row this keystroke targets, or null. Matched on `e.code` rather
+     * than `e.key` because Alt+digit produces a symbol (not a digit) on macOS
+     * and several European layouts.
+     */
+    function digitShortcutIndex(e: KeyboardEvent): number | null {
+        if (digitShortcuts === 'none') return null;
+        if (digitShortcuts === 'alt' && !e.altKey) return null;
+        if (digitShortcuts === 'plain' && e.altKey) return null;
+        const match = /^Digit([1-9])$/.exec(e.code);
+        if (match) return parseInt(match[1], 10) - 1;
+        // Fall back to `key` for layouts/environments without a usable `code`.
+        if (digitShortcuts === 'plain' && /^[1-9]$/.test(e.key))
+            return parseInt(e.key, 10) - 1;
+        return null;
     }
 
     function onKeydown(e: KeyboardEvent) {
@@ -90,7 +140,7 @@
         }
         if (e.key === 'Enter') {
             e.preventDefault();
-            choose(highlight);
+            choose(highlight, e);
             return;
         }
         if (e.key === 'ArrowDown') {
@@ -103,14 +153,12 @@
             highlight = Math.max(highlight - 1, 0);
             return;
         }
-        // Digit shortcuts: 1-9 choose the Nth *visible* row. Digits are always
-        // shortcuts, never filter text (this is the requested behavior).
-        if (/^[1-9]$/.test(e.key)) {
+        const digitIndex = digitShortcutIndex(e);
+        if (digitIndex !== null) {
             e.preventDefault();
-            const idx = parseInt(e.key, 10) - 1;
-            if (idx < filtered.length) {
-                highlight = idx;
-                choose(idx);
+            if (digitIndex < filtered.length) {
+                highlight = digitIndex;
+                choose(digitIndex, e);
             }
             return;
         }
@@ -125,20 +173,25 @@
         bind:value={query}
         {placeholder}
         onkeydown={onKeydown}
+        oninput={() => (highlight = 0)}
         spellcheck="false"
         autocomplete="off"
     />
-    <div class="mv-kbd-rows">
+    <div class="mv-kbd-rows" bind:this={rowsEl}>
         {#if filtered.length === 0}
             <div class="mv-kbd-empty">{emptyText}</div>
         {/if}
         {#each filtered as item, i (item.id)}
+            {@const header = sectionHeaderAt(i)}
+            {#if header}
+                <div class="mv-kbd-section">{header}</div>
+            {/if}
             <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
             <div
                 class="mv-kbd-row"
                 class:is-highlight={i === highlight}
                 class:is-active={showActiveState && item.active}
-                onclick={() => choose(i)}
+                onclick={(e) => choose(i, e)}
                 onmousemove={() => (highlight = i)}
             >
                 <span class="mv-kbd-row-num">{i < 9 ? i + 1 : ''}</span>
@@ -154,6 +207,9 @@
             </div>
         {/each}
     </div>
+    {#if statusText}
+        <div class="mv-kbd-status">{statusText}</div>
+    {/if}
 </div>
 
 <style>
@@ -180,6 +236,24 @@
         color: var(--text-muted);
         padding: 8px 6px;
         font-size: var(--font-ui-small);
+    }
+
+    .mv-kbd-status {
+        color: var(--text-muted);
+        font-size: var(--font-ui-smaller);
+    }
+
+    .mv-kbd-section {
+        color: var(--text-faint);
+        font-size: var(--font-ui-smaller);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 8px 8px 3px;
+    }
+
+    /* No leading gap for the first section header in the list. */
+    .mv-kbd-section:first-child {
+        padding-top: 2px;
     }
 
     .mv-kbd-row {
