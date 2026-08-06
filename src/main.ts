@@ -444,6 +444,24 @@ export default class MapViewPlugin extends Plugin {
         });
 
         this.addCommand({
+            id: 'map-go-to-place',
+            name: 'Go to place on map',
+            icon: 'locate-fixed',
+            callback: async () => {
+                let view = findOpenMapView(this.app);
+                if (!view)
+                    view = await this.openMap(this.settings.openMapBehavior);
+                if (view) {
+                    const mapView = view as MainMapView;
+                    this.app.workspace.setActiveLeaf(mapView.leaf, {
+                        focus: true,
+                    });
+                    mapView.mapContainer.openGoToModal();
+                }
+            },
+        });
+
+        this.addCommand({
             id: 'quick-map-embed',
             name: 'Add an embedded map',
             icon: 'log-in',

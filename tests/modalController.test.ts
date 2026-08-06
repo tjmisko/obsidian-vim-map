@@ -25,6 +25,7 @@ function makeCtx(overrides: Partial<ModalActionContext> = {}) {
         openLayers: 0,
         openPresets: 0,
         openEdit: 0,
+        openGoTo: 0,
         toggleControls: 0,
     };
     const ctx: ModalActionContext = {
@@ -55,6 +56,9 @@ function makeCtx(overrides: Partial<ModalActionContext> = {}) {
         },
         openEdit: () => {
             calls.openEdit++;
+        },
+        openGoTo: () => {
+            calls.openGoTo++;
         },
         toggleControls: () => {
             calls.toggleControls++;
@@ -194,6 +198,7 @@ describe('command bindings (uppercase / Shift+letter)', () => {
         ['P', 'openPresets'],
         ['E', 'openEdit'],
         ['M', 'toggleControls'],
+        ['G', 'openGoTo'],
     ];
 
     for (const [key, expectedCall] of cases) {
@@ -225,10 +230,14 @@ describe('command bindings (uppercase / Shift+letter)', () => {
     });
 
     it('should be inert in insert and edit modes', () => {
-        for (const key of ['F', 'V', 'L', 'P', 'E', 'M']) {
+        for (const key of ['F', 'V', 'L', 'P', 'E', 'M', 'G']) {
             expect(lookupBinding('insert', key, true)).toBeUndefined();
             expect(lookupBinding('edit', key, true)).toBeUndefined();
         }
+    });
+
+    it('should leave lowercase g unbound so vim-style g-prefixes stay free', () => {
+        expect(lookupBinding('normal', 'g', false)).toBeUndefined();
     });
 });
 

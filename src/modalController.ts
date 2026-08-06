@@ -49,6 +49,8 @@ export interface ModalActionContext {
     openPresets(): void;
     /** Open the Edit-tools modal (Shift+E). */
     openEdit(): void;
+    /** Open the Go-to place finder modal (Shift+G). */
+    openGoTo(): void;
     /** Toggle the visibility of the top-left map controls panel (Shift+M). */
     toggleControls(): void;
 }
@@ -119,6 +121,7 @@ export const KEYMAP: ModalKeyBinding[] = [
     { mode: 'normal', key: 'P', action: (c) => c.openPresets() },
     { mode: 'normal', key: 'E', action: (c) => c.openEdit() },
     { mode: 'normal', key: 'M', action: (c) => c.toggleControls() },
+    { mode: 'normal', key: 'G', action: (c) => c.openGoTo() },
 ];
 
 /** Build the O(1) lookup key for a (mode, key, shift) triple. */
@@ -318,6 +321,9 @@ export class ModalController {
             },
             openEdit: () => {
                 (this.host as any).openEditModal?.();
+            },
+            openGoTo: () => {
+                (this.host as any).openGoToModal?.();
             },
             toggleControls: () => {
                 this.host.display.controls?.toggleControlsVisibility?.();

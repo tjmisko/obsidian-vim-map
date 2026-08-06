@@ -89,6 +89,8 @@ import ViewModal from './components/ViewModal.svelte';
 import LayersModal from './components/LayersModal.svelte';
 import PresetsModal from './components/PresetsModal.svelte';
 import EditModal from './components/EditModal.svelte';
+import GoToModal from './components/GoToModal.svelte';
+import { boundsOfLayer } from 'src/placeSearch';
 import { type RoutingResult } from 'src/routing';
 import { getMarkerFromUser } from 'src/markerSelectDialog';
 
@@ -1667,6 +1669,55 @@ export class MapContainer {
         this.highLevelSetViewState(newState);
     }
 
+    /**
+     * Focus the map on a layer that's already on it — the "go to" action of the
+     * Shift+G modal.
+     *
+     * A marker goes through the same path as a search result (center at
+     * `zoomOnGoFromNote`, highlight it). A region or path has an extent rather
+     * than a point, so it gets fitted to its bounds instead, capped at the same
+     * zoom as an auto-fit.
+     *
+     * With `keepZoom` the current zoom is preserved and the map only pans when
+     * the target isn't already on screen, matching `goToSearchResult`.
+     */
+    goToLayer(layer: BaseGeoLayer, keepZoom: boolean = false) {
+        if (!layer) return;
+        if (layer instanceof FileMarker) {
+            this.goToSearchResult(layer.location, layer, keepZoom);
+            return;
+        }
+        // `getBounds()` measures the rendered Leaflet layer, so this only works
+        // for layers currently on the map — which is exactly what the modal lists.
+        const bounds = boundsOfLayer(layer);
+        if (!bounds) return;
+        this.setHighlight(layer);
+        if (keepZoom) {
+            const center = bounds.getCenter();
+            if (!this.display.map.getBounds().contains(center))
+                this.highLevelSetViewState({ mapCenter: center });
+            return;
+        }
+        this.display.map.fitBounds(bounds, {
+            maxZoom: Math.min(
+                this.settings.zoomOnGoFromNote,
+                this.getMapSource().maxZoom ?? consts.DEFAULT_MAX_TILE_ZOOM,
+            ),
+        });
+    }
+
+    /**
+     * Focus the map on a geocoder result that isn't in the vault, dropping the
+     * transient search-result marker (only one at a time) and revealing the
+     * control that clears it. The search control is absent in embedded maps.
+     */
+    goToExternalPlace(result: GeoSearchResult, keepZoom: boolean = false) {
+        if (!result?.location) return;
+        this.removeSearchResultMarker();
+        this.addSearchResultMarker(result, keepZoom);
+        this.display.searchControls?.showClearButton();
+    }
+
     removeSearchResultMarker() {
         if (this.display.searchResult) {
             this.display.searchResult.removeFrom(this.display.map);
@@ -2010,6 +2061,10 @@ export class MapContainer {
 
     public openEditModal() {
         this.openKeyboardModal(EditModal);
+    }
+
+    public openGoToModal() {
+        this.openKeyboardModal(GoToModal);
     }
 
     createTileLayer(

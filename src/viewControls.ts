@@ -150,10 +150,23 @@ export class SearchControl extends leaflet.Control {
         this.clearButton.addClass('mv-hidden');
         this.clearButton.addEventListener('click', (ev: MouseEvent) => {
             this.view.removeSearchResultMarker();
-            this.clearButton.addClass('mv-hidden');
+            this.hideClearButton();
         });
 
         return div;
+    }
+
+    /**
+     * Reveal the "clear search result" button. Public so callers that drop a
+     * search-result marker from outside this control (e.g. the Go-to modal via
+     * `MapContainer.goToExternalPlace`) can keep the button in sync.
+     */
+    showClearButton() {
+        this.clearButton?.removeClass('mv-hidden');
+    }
+
+    hideClearButton() {
+        this.clearButton?.addClass('mv-hidden');
     }
 
     openSearch(existingLayers: LayerCache) {
@@ -207,7 +220,7 @@ export class SearchControl extends leaflet.Control {
                 );
             } else if (selection && selection.location) {
                 this.view.addSearchResultMarker(selection, keepZoom);
-                this.clearButton.removeClass('mv-hidden');
+                this.showClearButton();
             }
         };
         searchDialog.searchArea = this.view.display.map.getBounds();
