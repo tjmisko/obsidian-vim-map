@@ -115,10 +115,12 @@ winning over display rules and the boundary layer's own color.
 | File                              | Purpose                                                                                                                           |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `src/boundaryLayers.ts`           | Pure boundary logic: `filterOutDisabledBoundaryLayers`, `getBoundaryLayerForLayer`, `boundaryPaneName`, `boundaryLayerIdForNote`. |
+| `src/placeSearch.ts`              | Pure Go-to logic: collect/classify/label/sort the places on the map, fuzzy filter, distance format, geocoder-result merge.        |
 | `docs/boundary-layers-plan.md`    | Design & implementation plan for the feature.                                                                                     |
 | `docs/boundary-note-authoring.md` | How to tag a note as a boundary region.                                                                                           |
 | `tests/boundaryLayers.test.ts`    | Tests for the boundary logic helpers.                                                                                             |
 | `tests/geometryUtils.test.ts`     | Tests for point-in-polygon and area helpers.                                                                                      |
+| `tests/placeSearch.test.ts`       | Tests for the Go-to place helpers.                                                                                                |
 
 ## 6. Modified upstream files
 
@@ -160,13 +162,33 @@ shift-agnostic in `KEYMAP`, so the lowercase vim bindings (`f`=fit,
 | `Shift+P` | Presets | Fuzzy preset list; digit/Enter applies and closes                   |
 | `Shift+E` | Edit    | On-map edit tools (drawing mode, note/heading/tags)                 |
 | `Shift+M` | Menu    | Toggles the top-left controls panel (minimize)                      |
+| `Shift+G` | Go to   | Fuzzy place finder over the map's layers + OpenStreetMap            |
 
 All modals mount a Svelte component via `SvelteModal`, receive the
 `MapContainer` as `view`, and apply changes through `view.highLevelSetViewState`
-(which re-renders the map and re-syncs the controls panel). The two fuzzy
-modals share `KeyboardNavList.svelte` — a reusable numbered/fuzzy list where
-digits 1-9 are _row shortcuts_ (never filter text), arrows move the highlight,
-Enter chooses, Escape closes, and `stayOpen` decides toggle-vs-select.
+(which re-renders the map and re-syncs the controls panel). The fuzzy modals
+share `KeyboardNavList.svelte` — a reusable numbered/fuzzy list where digits 1-9
+are _row shortcuts_ (never filter text), arrows move the highlight, Enter
+chooses, Escape closes, and `stayOpen` decides toggle-vs-select.
+
+**Go to (`Shift+G`)** — a place finder that navigates without touching the
+filter. It lists the layers currently on the map (markers, boundary regions,
+GeoJSON/GPX paths) nearest-first with a distance sublabel, and appends
+OpenStreetMap geocoder results in a second section once four characters are
+typed. Sourcing from `display.layers` rather than the plugin-wide cache keeps
+the list in step with the active query _and_ guarantees `getBounds()` has a
+rendered Leaflet layer to measure. `Enter` centers at `zoomOnGoFromNote` (or
+fits a region/path to its extent); `Shift+Enter` keeps the current zoom. All the
+list math is pure and lives in `src/placeSearch.ts`.
+
+`KeyboardNavList` gained five additive props for it, each defaulting to the
+previous behavior: `section` headers on `NavItem`, a bindable `query`,
+`filterItems` (off when the parent filters), `digitShortcuts`
+(`'plain'`/`'alt'`/`'none'` — Go-to uses `'alt'` so plain digits stay typable in
+place names, matched on `e.code` since Alt+digit yields a symbol on some
+layouts), and `statusText`. `onSelect` now also receives the originating event
+(for `Shift+Enter`), the highlight resets on input, and the highlighted row is
+scrolled into view.
 
 **Big zoom step** — holding Alt/Option (or Cmd/Ctrl) with `+`/`-` uses
 `settings.zoomStepBig` (default `2.0`) instead of `settings.zoomStep`, for a
@@ -185,13 +207,17 @@ prefix flag is dropped via `attributionControl.setPrefix(false)` in `createMap`.
 
 **New files:** `src/components/KeyboardNavList.svelte`,
 `FiltersModal.svelte`, `ViewModal.svelte`, `LayersModal.svelte`,
-`PresetsModal.svelte`, `EditModal.svelte`. **Touched:** `modalController.ts`
+`PresetsModal.svelte`, `EditModal.svelte`, `GoToModal.svelte`,
+`src/placeSearch.ts`. **Touched:** `modalController.ts`
 (command bindings + big-zoom), `viewControls.ts` +
-`ViewControlsPanel.svelte` (`toggleControlsVisibility`/`toggleMinimized`),
-`mapContainer.ts` (`open*Modal` methods, zoom-button gate, attribution prefix),
-`settings.ts` + `settingsTab.ts` (`showZoomButtons`, `zoomStepBig`).
+`ViewControlsPanel.svelte` (`toggleControlsVisibility`/`toggleMinimized`,
+`SearchControl.show/hideClearButton`), `mapContainer.ts` (`open*Modal` methods,
+`goToLayer`/`goToExternalPlace`, zoom-button gate, attribution prefix),
+`main.ts` ("Go to place on map" command), `consts.ts`
+(`MAX_PLACE_SUGGESTIONS`), `settings.ts` + `settingsTab.ts`
+(`showZoomButtons`, `zoomStepBig`).
 **Tests:** `tests/modalController.test.ts` extended for the command bindings and
-the effective zoom step.
+the effective zoom step; `tests/placeSearch.test.ts` for the Go-to helpers.
 
 ## 8. Removal: Links (marker-edge) feature
 

@@ -34,6 +34,7 @@ keyboard-navigable modals:
 | `Shift+P` | **Presets** — a fuzzy list of presets; press a number or Enter to apply one                                                        |
 | `Shift+E` | **Edit** — on-map editing tools (drawing mode, target note, heading, tags)                                                         |
 | `Shift+M` | **Menu** — show/hide the top-left controls panel                                                                                   |
+| `Shift+G` | **Go to** — a fuzzy list of places to focus the map on (see below)                                                                 |
 
 The lowercase keys keep their vim meanings and don't conflict:
 
@@ -50,6 +51,35 @@ The lowercase keys keep their vim meanings and don't conflict:
   shortcuts, never filter text).
 - **Arrow keys** move the highlight; **Enter** chooses the highlighted row.
 - **Escape** closes the modal.
+
+## Go to (`Shift+G`)
+
+A place finder that focuses the map without touching your filter. It lists every
+place **currently on the map** — note markers, boundary regions and GeoJSON/GPX
+paths — nearest to the map center first, with the distance on each row. Because
+it reads what's displayed, an active query filter narrows this list too.
+
+Type at least four characters and OpenStreetMap results are appended in their own
+section, for places you haven't written about yet. This uses the same geocoder as
+the rest of Map View, so it needs the **OpenStreetMap user email** setting (or a
+Google API key) to be filled in.
+
+| Key           | Action                                                                  |
+| ------------- | ----------------------------------------------------------------------- |
+| `Enter`       | Center and zoom to the place, highlighting it                           |
+| `Shift+Enter` | Go to the place keeping the current zoom (pans only if it's off-screen) |
+| `Alt`+`1`–`9` | Jump straight to the Nth visible row                                    |
+| Arrow keys    | Move the highlight                                                      |
+| `Escape`      | Close without moving                                                    |
+
+Unlike the other fuzzy modals, plain digits type into the filter here — place
+names contain them — which is why the row shortcut is `Alt`+digit.
+
+Choosing a region or a path fits the map to its whole extent rather than
+centering on a point. Choosing an OpenStreetMap result drops a temporary search
+marker, which the trash button next to the map's magnifier clears.
+
+The same list is available from the command palette as **"Go to place on map"**.
 
 ## Escape
 
