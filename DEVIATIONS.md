@@ -254,7 +254,40 @@ used here.
   `fileMarker.isLayerLinkedFrom` (shared with the query engine).
 - Deleted `docs/links-view.md` + its screenshot.
 
-## 9. Rebasing / maintenance notes
+## 9. Feature: Debug log for consoleless devices
+
+Obsidian Mobile reports a broken plugin as a bare "Failed to load plugin"
+banner, with no console to inspect. `src/debugLog.ts` is a capped in-memory
+entry buffer (500 entries) that can be flushed to a **note in the vault**
+(`Map View Debug Log.md`), so the evidence is readable on a phone and syncs to
+a machine that does have a console.
+
+`MapViewPlugin.onload` is now a thin wrapper: the original body moved to
+`loadPlugin()`, which logs a `phase: <name>` marker before each registration
+step, and the wrapper catches any throw, records it with its stack, flushes the
+note best-effort, shows a Notice, and **rethrows** so Obsidian's own failure
+handling is unchanged. The last logged phase names the step that threw.
+
+Two commands (plain `callback`, so they need no editor or active view and work
+from the mobile palette): **"Show debug log"** opens `DebugLogModal.svelte` —
+selectable text plus Copy / Write to note / Clear — and **"Write debug log to
+note"** flushes without opening anything.
+
+The standing limitation: nothing here can catch a failure _before_ `onload`
+runs — a bundle that fails to parse, or a top-level `require` of a Node builtin
+that mobile lacks. In that case the note is simply absent, which is itself a
+diagnosis.
+
+**New files:** `src/debugLog.ts`, `src/components/DebugLogModal.svelte`,
+`tests/debugLog.test.ts`. **Touched:** `src/main.ts` (`onload` wrapper +
+`loadPlugin` phase markers + the two commands).
+
+**Gotcha worth remembering:** import `.svelte` components into `main.ts` with a
+**relative** specifier. An aliased `src/components/Foo.svelte` is not resolved
+by rollup-plugin-svelte and silently becomes an external dependency — a
+`require()` that fails at runtime, with only a build warning to tell you.
+
+## 10. Rebasing / maintenance notes
 
 - The feature deliberately plugs into upstream's existing pipeline rather than
   forking it, so most upstream changes merge cleanly.

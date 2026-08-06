@@ -75,6 +75,16 @@ import { MapPreviewPopup } from 'src/mapPreviewPopup';
 import { LayerCache } from 'src/layerCache';
 import { BaseGeoLayer, cacheTagsFromLayers } from 'src/baseGeoLayer';
 import { makeSettingsReactive } from 'src/settingsReactive.svelte';
+import {
+    DEBUG_LOG_NOTE_PATH,
+    logDebug,
+    logDebugError,
+    writeDebugLogToVault,
+} from 'src/debugLog';
+// Relative, not 'src/...': rollup-plugin-svelte only resolves .svelte through a
+// relative specifier here, and an aliased one silently becomes an external
+// dependency -- i.e. a require() that fails at runtime.
+import DebugLogModal from './components/DebugLogModal.svelte';
 
 export default class MapViewPlugin extends Plugin {
     settings: PluginSettings;
@@ -98,10 +108,40 @@ export default class MapViewPlugin extends Plugin {
     public allTags: Set<string>;
     private allMapContainers: MapContainer[] = [];
 
+    /**
+     * Thin wrapper around {@link loadPlugin} whose only job is to make a failed
+     * load diagnosable on a device with no developer console.
+     *
+     * Obsidian reports a load failure as a bare "Failed to load plugin" banner,
+     * which on a phone is the entire available information. So we record the
+     * error with its stack, flush the debug log to a note in the vault, and
+     * rethrow — Obsidian still reports the failure exactly as before, but now
+     * there's a readable trail. The phase markers inside `loadPlugin` mean the
+     * last logged phase names the step that threw.
+     */
     async onload() {
+        logDebug(`onload: start (plugin ${this.manifest?.version ?? '?'})`);
+        try {
+            await this.loadPlugin();
+            logDebug('onload: completed successfully');
+        } catch (error) {
+            logDebugError('onload: FAILED', error);
+            await writeDebugLogToVault(this.app, this);
+            new Notice(
+                `Map View failed to load. Details were written to "${DEBUG_LOG_NOTE_PATH}".`,
+                15000,
+            );
+            // Rethrow so Obsidian's own failure handling is unchanged.
+            throw error;
+        }
+    }
+
+    private async loadPlugin() {
+        logDebug('phase: settings');
         await this.loadSettings();
         await convertLegacySettings(this.settings, this);
 
+        logDebug('phase: ribbon');
         // Add a new ribbon entry to the left bar
         this.addRibbonIcon('map-pin', 'Open map view', (ev: MouseEvent) => {
             this.openMap(
@@ -109,10 +149,12 @@ export default class MapViewPlugin extends Plugin {
             );
         });
 
+        logDebug('phase: register-view');
         this.registerView(consts.MAP_VIEW_NAME, (leaf: WorkspaceLeaf) => {
             return new MainMapView(leaf, this.settings, this);
         });
 
+        logDebug('phase: register-bases-view');
         this?.registerBasesView('map-view-plugin', {
             name: 'Map View',
             icon: 'map-pin',
@@ -121,9 +163,11 @@ export default class MapViewPlugin extends Plugin {
             options: () => BasesMapView.getViewOptions(this.settings),
         });
 
+        logDebug('phase: editor-extension');
         this.editorLinkReplacePlugin = getLinkReplaceEditorPlugin(this);
         this.registerEditorExtension(this.editorLinkReplacePlugin);
 
+        logDebug('phase: display-rules');
         this.displayRulesCache = new DisplayRulesCache(this.app, this.settings);
         this.displayRulesCache.build(this.settings.displayRules);
 
@@ -132,6 +176,7 @@ export default class MapViewPlugin extends Plugin {
         // 	return new MiniMapView(leaf, this.settings, this);
         // });
 
+        logDebug('phase: protocol-handler');
         this.registerObsidianProtocolHandler(
             'mapview',
             async (params: ObsidianProtocolData) => {
@@ -178,6 +223,7 @@ export default class MapViewPlugin extends Plugin {
             },
         );
 
+        logDebug('phase: code-block-processors');
         this.registerMarkdownCodeBlockProcessor(
             'mapview',
             async (
@@ -282,6 +328,7 @@ export default class MapViewPlugin extends Plugin {
             );
         }
 
+        logDebug('phase: path-embeds');
         if (this.settings.handlePathEmbeds) {
             const embedRegistry: EmbedRegistry = this.app.embedRegistry;
             if (embedRegistry) {
@@ -310,6 +357,7 @@ export default class MapViewPlugin extends Plugin {
                 );
         }
 
+        logDebug('phase: post-processor-and-suggesters');
         this.registerMarkdownPostProcessor(replaceLinksPostProcessor(this));
 
         this.suggestor = new LocationSuggest(this.app, this.settings);
@@ -319,12 +367,14 @@ export default class MapViewPlugin extends Plugin {
         this.registerEditorSuggest(this.suggestor);
         this.registerEditorSuggest(this.tagSuggestor);
 
+        logDebug('phase: icon-factory');
         this.iconFactory = new IconFactory(document.body);
 
         this.mapPreviewPopup = null;
 
         this.allTags = new Set();
 
+        logDebug('phase: commands');
         // Register commands to the command palette
         // Command that opens the map view (same as clicking the map icon)
         this.addCommand({
@@ -402,6 +452,37 @@ export default class MapViewPlugin extends Plugin {
                     view.file,
                 );
                 dialog.open();
+            },
+        });
+
+        // Diagnostics. These are deliberately plain `callback` commands with no
+        // editor or view requirement, so they're reachable from the mobile
+        // command palette no matter what else is broken.
+        this.addCommand({
+            id: 'show-debug-log',
+            name: 'Show debug log',
+            icon: 'bug',
+            callback: () => {
+                new SvelteModal(
+                    DebugLogModal,
+                    this.app,
+                    this,
+                    this.settings,
+                ).open();
+            },
+        });
+
+        this.addCommand({
+            id: 'write-debug-log-to-note',
+            name: 'Write debug log to note',
+            icon: 'bug',
+            callback: async () => {
+                const ok = await writeDebugLogToVault(this.app, this);
+                new Notice(
+                    ok
+                        ? `Debug log written to "${DEBUG_LOG_NOTE_PATH}"`
+                        : 'Could not write the debug log note',
+                );
             },
         });
 
@@ -629,10 +710,12 @@ export default class MapViewPlugin extends Plugin {
             });
         }
 
+        logDebug('phase: cli-handlers');
         if ('registerCliHandler' in this) {
             registerCliHandlers(this, this.app, this.settings);
         }
 
+        logDebug('phase: settings-tab');
         this.addSettingTab(new SettingsTab(this.app, this));
 
         // As part of geoLinkReplacers.ts, geolinks in notes are embedded with mouse events that
@@ -640,6 +723,7 @@ export default class MapViewPlugin extends Plugin {
         // We can only add these as strings, so to make this work, the functions that handle these mouse
         // events need to be global.
         // This one handles a geolink in a note.
+        logDebug('phase: global-geolink-handlers');
         (window as any).handleMapViewGeoLink = (
             event: PointerEvent,
             documentLocation: number,
@@ -789,6 +873,7 @@ export default class MapViewPlugin extends Plugin {
             this.mapPreviewPopup?.close(event);
         };
 
+        logDebug('phase: workspace-events');
         // Add items to the file context menu (run when the context menu is built)
         // This is the context menu in the File Explorer and clicking "More options" (three dots) from within a file.
         this.registerEvent(
@@ -859,6 +944,7 @@ export default class MapViewPlugin extends Plugin {
             ),
         );
 
+        logDebug('phase: vault-events');
         if (this.settings.loadLayersAhead)
             this.app.workspace.onLayoutReady(() => {
                 this.buildInitialLayersCache();
@@ -908,6 +994,7 @@ export default class MapViewPlugin extends Plugin {
             }),
         );
 
+        logDebug('phase: purge-tiles');
         purgeTilesBySettings(this.settings);
     }
 
