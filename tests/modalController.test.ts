@@ -8,6 +8,8 @@ vi.mock('src/components/ModeBadge.svelte', () => ({ default: class {} }));
 import {
     lookupBinding,
     decideEscapeAction,
+    shouldShowModeBadge,
+    shouldFocusMapContainer,
     KEYMAP,
     type ModalActionContext,
 } from 'src/modalController';
@@ -315,5 +317,54 @@ describe('decideEscapeAction', () => {
                 popupOpen: true,
             }),
         ).toBe('exitEdit');
+    });
+});
+
+describe('shouldShowModeBadge', () => {
+    it('should show the badge on desktop when the feature is on', () => {
+        expect(
+            shouldShowModeBadge({ featureEnabled: true, mobile: false }),
+        ).toBe(true);
+    });
+
+    it('should hide the badge when the feature is off', () => {
+        expect(
+            shouldShowModeBadge({ featureEnabled: false, mobile: false }),
+        ).toBe(false);
+    });
+
+    it('should hide the badge on mobile even when the feature is on', () => {
+        // The modes it names are only reachable by keystroke.
+        expect(
+            shouldShowModeBadge({ featureEnabled: true, mobile: true }),
+        ).toBe(false);
+    });
+});
+
+describe('shouldFocusMapContainer', () => {
+    it('should focus the map on desktop in normal mode', () => {
+        expect(shouldFocusMapContainer({ mode: 'normal', mobile: false })).toBe(
+            true,
+        );
+    });
+
+    it('should focus the map on desktop in edit mode', () => {
+        expect(shouldFocusMapContainer({ mode: 'edit', mobile: false })).toBe(
+            true,
+        );
+    });
+
+    it('should not steal focus from an input in insert mode', () => {
+        expect(shouldFocusMapContainer({ mode: 'insert', mobile: false })).toBe(
+            false,
+        );
+    });
+
+    it('should never focus the map on mobile', () => {
+        // Nothing would catch the keystrokes, and it fights the on-screen keyboard.
+        for (const mode of ['normal', 'edit', 'insert'] as const)
+            expect(shouldFocusMapContainer({ mode, mobile: true }), mode).toBe(
+                false,
+            );
     });
 });

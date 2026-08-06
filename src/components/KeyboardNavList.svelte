@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { Platform } from 'obsidian';
     import { onMount, tick } from 'svelte';
     import { fuzzyMatch } from '../placeSearch';
 
@@ -12,6 +13,13 @@
     // jump to the Nth visible row and never enter the filter text, 'alt' moves
     // that to Alt+1-9 so plain digits stay typable (place names contain them),
     // and 'none' disables them.
+    //
+    // On mobile the list degrades to a plain tap list: rows are already
+    // clickable, so we drop the affordances that need a keyboard (autofocus,
+    // which would raise the on-screen keyboard over the results, and the row
+    // numbers, which advertise shortcuts nothing can type) and give the rows
+    // touch-sized hit areas.
+    const isTouch = Platform.isMobile;
 
     export type NavItem = {
         /** Stable identity (used for the {#each} key). */
@@ -105,6 +113,9 @@
 
     onMount(async () => {
         await tick();
+        // On touch, focusing raises the on-screen keyboard, which covers the
+        // rows the user came here to tap. They can still tap the box to filter.
+        if (isTouch) return;
         inputEl?.focus();
     });
 
@@ -165,7 +176,7 @@
     }
 </script>
 
-<div class="mv-kbd-list">
+<div class="mv-kbd-list" class:is-touch={isTouch}>
     <input
         class="mv-kbd-filter"
         type="text"
@@ -194,7 +205,9 @@
                 onclick={(e) => choose(i, e)}
                 onmousemove={() => (highlight = i)}
             >
-                <span class="mv-kbd-row-num">{i < 9 ? i + 1 : ''}</span>
+                {#if !isTouch}
+                    <span class="mv-kbd-row-num">{i < 9 ? i + 1 : ''}</span>
+                {/if}
                 {#if showActiveState}
                     <span class="mv-kbd-row-check"
                         >{item.active ? '✓' : ''}</span
@@ -268,6 +281,17 @@
 
     .mv-kbd-row.is-highlight {
         background-color: var(--background-modifier-hover);
+    }
+
+    /* Touch targets: the desktop row is ~24px tall, too small to hit reliably. */
+    .mv-kbd-list.is-touch .mv-kbd-row {
+        padding: 11px 8px;
+    }
+
+    /* Without a keyboard the highlight tracks nothing the user drives, and on
+     * touch it reads as a stuck selection — the tap itself is the feedback. */
+    .mv-kbd-list.is-touch .mv-kbd-row.is-highlight {
+        background-color: transparent;
     }
 
     .mv-kbd-row.is-active .mv-kbd-row-label {

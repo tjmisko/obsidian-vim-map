@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { App } from 'obsidian';
+    import { App, Platform } from 'obsidian';
     import { onDestroy } from 'svelte';
     import { debounce } from 'ts-debounce';
 
@@ -140,7 +140,11 @@
     {close}
 />
 <div class="mv-kbd-hint">
-    Enter to go · Shift+Enter keeps zoom · Alt+1-9 to jump · Esc to cancel
+    {#if Platform.isMobile}
+        Tap a place to go there
+    {:else}
+        Enter to go · Shift+Enter keeps zoom · Alt+1-9 to jump · Esc to cancel
+    {/if}
 </div>
 
 <style>

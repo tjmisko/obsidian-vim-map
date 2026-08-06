@@ -482,6 +482,27 @@ export function isMobile(app: App): boolean {
     return Platform.isMobile;
 }
 
+/**
+ * Whether the map's `+`/`-` zoom control should be rendered.
+ *
+ * `settings.showZoomButtons` is off by default because this fork zooms with the
+ * keyboard, but a touch device has no `+`/`-` keys — without the buttons, pinch
+ * is the only way to zoom. So mobile counts as an implicit opt-in, while a view
+ * that asks for no zoom buttons (e.g. the hover preview popup) and a locked map
+ * still win.
+ *
+ * Pure so the rule is testable without a Leaflet map.
+ */
+export function shouldShowZoomButtons(input: {
+    userSetting: boolean;
+    viewSetting: boolean;
+    locked: boolean;
+    mobile: boolean;
+}): boolean {
+    if (!input.viewSetting || input.locked) return false;
+    return input.userSetting || input.mobile;
+}
+
 export function trimmedFileName(file: TFile) {
     const MAX_LENGTH = 12;
     const name = file.basename;

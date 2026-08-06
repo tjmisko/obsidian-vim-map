@@ -1,3 +1,4 @@
+import { Platform } from 'obsidian';
 import type { MapContainer } from './mapContainer';
 import { mount, unmount } from 'svelte';
 import ModeBadge from './components/ModeBadge.svelte';
@@ -177,6 +178,34 @@ export function decideEscapeAction(input: {
     if (input.editMode) return 'exitEdit';
     if (input.popupOpen) return 'closePopup';
     return 'none';
+}
+
+/**
+ * Whether the mode badge should be rendered.
+ *
+ * The badge names modes (Normal/Edit/Insert) you can only move between with
+ * keystrokes, so on a touch device it is a label for something unreachable.
+ * The controller itself stays alive there — an external keyboard on a tablet
+ * still drives the map, it just doesn't get the indicator.
+ */
+export function shouldShowModeBadge(input: {
+    featureEnabled: boolean;
+    mobile: boolean;
+}): boolean {
+    return input.featureEnabled && !input.mobile;
+}
+
+/**
+ * Whether {@link ModalController.focus} should pull focus onto the map
+ * container. Never while an input has focus (that would kick the user out of
+ * Insert mid-typing), and never on a touch device, where there are no
+ * keystrokes to catch and grabbing focus only fights the on-screen keyboard.
+ */
+export function shouldFocusMapContainer(input: {
+    mode: MapMode;
+    mobile: boolean;
+}): boolean {
+    return input.mode !== 'insert' && !input.mobile;
 }
 
 /**
@@ -438,16 +467,17 @@ export class ModalController {
         this.badgeMode = mode;
     }
 
-    private updateBadgeVisibility() {
-        if (!this.badgeWrapper) return;
-        this.badgeWrapper.style.display = this.isFeatureEnabled() ? '' : 'none';
-    }
-
     /** Recompute the mode and update the badge (visibility + label). */
     refreshBadge() {
         if (!this.badgeWrapper) return;
-        this.updateBadgeVisibility();
-        if (!this.isFeatureEnabled()) return;
+        const visible = shouldShowModeBadge({
+            featureEnabled: this.isFeatureEnabled(),
+            mobile: Platform.isMobile,
+        });
+        this.badgeWrapper.style.display = visible ? '' : 'none';
+        // Hidden means the ModeBadge component is never mounted at all, so a
+        // touch device pays nothing for it.
+        if (!visible) return;
         this.renderBadge(this.computeMode());
     }
 
@@ -455,10 +485,17 @@ export class ModalController {
 
     /**
      * Focus the map container so keystrokes land on it — but never steal focus
-     * from an input (Insert mode). WU-5 sets `tabindex` on this element.
+     * from an input (Insert mode) and never on touch (see
+     * {@link shouldFocusMapContainer}). WU-5 sets `tabindex` on this element.
      */
     focus() {
-        if (this.computeMode() === 'insert') return;
+        if (
+            !shouldFocusMapContainer({
+                mode: this.computeMode(),
+                mobile: Platform.isMobile,
+            })
+        )
+            return;
         const target = this.host.display.map?.getContainer?.();
         target?.focus?.();
     }

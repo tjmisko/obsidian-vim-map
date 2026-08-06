@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { App } from 'obsidian';
+    import { App, Platform } from 'obsidian';
     import { onMount, tick } from 'svelte';
     import { type PluginSettings } from '../settings';
     import { MapContainer } from '../mapContainer';
@@ -57,7 +57,13 @@
         bind:query
         bind:queryError
     />
-    <div class="mv-kbd-hint">Enter to close · Esc to cancel</div>
+    <div class="mv-kbd-hint">
+        {#if Platform.isMobile}
+            Filters apply as you type
+        {:else}
+            Enter to close · Esc to cancel
+        {/if}
+    </div>
 </div>
 
 <style>

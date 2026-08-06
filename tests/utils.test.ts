@@ -9,6 +9,7 @@ import {
     formatWithTemplates,
     matchByPosition,
     getTagUnderCursor,
+    shouldShowZoomButtons,
 } from 'src/utils';
 import * as regex from 'src/regex';
 
@@ -149,5 +150,53 @@ describe('getTagUnderCursor', () => {
         const match = getTagUnderCursor(line, 5);
         expect(match).toBeTruthy();
         expect(match![1]).toBe('#旅行');
+    });
+});
+
+describe('shouldShowZoomButtons', () => {
+    const desktopDefaults = {
+        userSetting: false,
+        viewSetting: true,
+        locked: false,
+        mobile: false,
+    };
+
+    it('should hide the buttons on desktop when the user has not opted in', () => {
+        expect(shouldShowZoomButtons(desktopDefaults)).toBe(false);
+    });
+
+    it('should show the buttons on desktop when the user opts in', () => {
+        expect(
+            shouldShowZoomButtons({ ...desktopDefaults, userSetting: true }),
+        ).toBe(true);
+    });
+
+    it('should show the buttons on mobile even without the user setting', () => {
+        // Mobile has no +/- keys, so pinch would otherwise be the only zoom.
+        expect(
+            shouldShowZoomButtons({ ...desktopDefaults, mobile: true }),
+        ).toBe(true);
+    });
+
+    it('should hide the buttons on mobile when the view opts out', () => {
+        // e.g. the hover preview popup, which wants a bare map.
+        expect(
+            shouldShowZoomButtons({
+                ...desktopDefaults,
+                mobile: true,
+                viewSetting: false,
+            }),
+        ).toBe(false);
+    });
+
+    it('should hide the buttons on mobile when the map is locked', () => {
+        expect(
+            shouldShowZoomButtons({
+                ...desktopDefaults,
+                mobile: true,
+                userSetting: true,
+                locked: true,
+            }),
+        ).toBe(false);
     });
 });

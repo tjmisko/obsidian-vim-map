@@ -85,3 +85,37 @@ The same list is available from the command palette as **"Go to place on map"**.
 
 `Escape` walks back through the interaction layers, in order: blur a focused
 input → exit drawing mode → close an open popup → (finally) leave the map.
+
+## On mobile
+
+Everything above assumes a keyboard, so on a phone or tablet the map falls back
+to touch without losing any capability. Nothing here needs to be configured —
+Map View detects the platform.
+
+- The **`+`/`-` zoom buttons are always shown**, whatever the **Show zoom
+  buttons** setting says. That setting exists because the keyboard zooms, and a
+  touch device has no `+` key — pinch would otherwise be the only way to zoom.
+- The **mode badge is hidden**. Normal/Edit/Insert are keystroke-driven, so the
+  indicator has nothing to report.
+- The map is **never given focus programmatically**, so it can't fight the
+  on-screen keyboard.
+- In the fuzzy modals (Layers / Presets / View / Go to), the filter box **isn't
+  focused on open** — the on-screen keyboard would cover the very rows you came
+  to tap. Tap the box when you want to filter. Rows get touch-sized hit areas,
+  and the `1`–`9` row numbers are hidden since nothing can type them.
+
+Every keyboard command has a touch equivalent:
+
+| Keyboard command                           | On mobile                                            |
+| ------------------------------------------ | ---------------------------------------------------- |
+| `Shift+F` / `V` / `L` / `P` / `E`          | The matching section of the top-left controls panel  |
+| `Shift+M`                                  | The minimize/maximize button in the panel's corner   |
+| `Shift+G`                                  | The **"Go to place on map"** command                 |
+| `f` (fit), `/` (query), `e` (drawing mode) | The controls panel's View, Filters and Edit sections |
+
+Commands are reachable from the command palette, and worth adding to the
+[mobile toolbar](https://help.obsidian.md/mobile#Customize+mobile+toolbar) if
+you use them often.
+
+An external keyboard attached to a tablet still drives the map normally — the
+modal bindings stay live, they just aren't advertised in the UI.

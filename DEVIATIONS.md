@@ -205,19 +205,35 @@ control bars now take Obsidian's theme surface (`--background-*`/`--text-*`),
 and the bottom-right attribution is shrunk/dimmed and theme-aware. The "Leaflet"
 prefix flag is dropped via `attributionControl.setPrefix(false)` in `createMap`.
 
+**Mobile degradation** — the whole feature assumes a keyboard, so on
+`Platform.isMobile` the keyboard-only affordances are dropped while every
+capability stays reachable by touch. The rules are pure predicates so they're
+testable without a Leaflet map: `utils.shouldShowZoomButtons` (mobile is an
+implicit opt-in, since `showZoomButtons` defaults off for keyboard zooming;
+the per-view flag and the lock still win), `shouldShowModeBadge` and
+`shouldFocusMapContainer` (both in `modalController.ts`). `KeyboardNavList`
+additionally skips its autofocus (the on-screen keyboard would cover the rows),
+hides the `1`-`9` row numbers, drops the highlight background, and pads rows to
+a touch-sized target; `GoToModal`/`FiltersModal` swap their key-hint line for a
+touch one. The `ModalController` itself is **not** disabled on mobile, so an
+external keyboard on a tablet still works — it just isn't advertised.
+
 **New files:** `src/components/KeyboardNavList.svelte`,
 `FiltersModal.svelte`, `ViewModal.svelte`, `LayersModal.svelte`,
 `PresetsModal.svelte`, `EditModal.svelte`, `GoToModal.svelte`,
 `src/placeSearch.ts`. **Touched:** `modalController.ts`
-(command bindings + big-zoom), `viewControls.ts` +
+(command bindings + big-zoom + the mobile predicates), `viewControls.ts` +
 `ViewControlsPanel.svelte` (`toggleControlsVisibility`/`toggleMinimized`,
 `SearchControl.show/hideClearButton`), `mapContainer.ts` (`open*Modal` methods,
 `goToLayer`/`goToExternalPlace`, zoom-button gate, attribution prefix),
 `main.ts` ("Go to place on map" command), `consts.ts`
 (`MAX_PLACE_SUGGESTIONS`), `settings.ts` + `settingsTab.ts`
-(`showZoomButtons`, `zoomStepBig`).
-**Tests:** `tests/modalController.test.ts` extended for the command bindings and
-the effective zoom step; `tests/placeSearch.test.ts` for the Go-to helpers.
+(`showZoomButtons`, `zoomStepBig`), `utils.ts` (`shouldShowZoomButtons`),
+`docs/keyboard-navigation.md` ("On mobile").
+**Tests:** `tests/modalController.test.ts` extended for the command bindings,
+the effective zoom step and the badge/focus mobile predicates;
+`tests/utils.test.ts` for `shouldShowZoomButtons`; `tests/placeSearch.test.ts`
+for the Go-to helpers.
 
 ## 8. Removal: Links (marker-edge) feature
 

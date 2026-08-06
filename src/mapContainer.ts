@@ -1963,12 +1963,16 @@ export class MapContainer {
     }
 
     addZoomButtons() {
-        // Gated on BOTH the global user setting (off by default — keeps the map
-        // clean for keyboard zooming) and the per-view opt-out flag.
+        // Gated on the global user setting (off by default — keeps the map
+        // clean for keyboard zooming), the per-view opt-out flag, and the lock.
+        // Mobile overrides the global default: see utils.shouldShowZoomButtons.
         if (
-            this.settings.showZoomButtons &&
-            this.viewSettings.showZoomButtons &&
-            !this.state.lock
+            utils.shouldShowZoomButtons({
+                userSetting: !!this.settings.showZoomButtons,
+                viewSetting: !!this.viewSettings.showZoomButtons,
+                locked: !!this.state.lock,
+                mobile: utils.isMobile(this.app),
+            })
         ) {
             this.display.zoomControls = leaflet.control
                 .zoom({
