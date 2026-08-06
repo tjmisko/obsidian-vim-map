@@ -1,7 +1,7 @@
 {
-    "name": "obsidian-map-view",
+    "name": "obsidian-vim-map",
     "version": "6.1.4",
-    "description": "An interactive map view for Obsidian.md",
+    "description": "An interactive map view for Obsidian.md with keyboard-first, vim-like navigation",
     "main": "main.js",
     "type": "module",
     "scripts": {

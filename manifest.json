@@ -1,8 +1,10 @@
 {
-    "id": "obsidian-map-view",
-    "name": "Map View",
+    "id": "obsidian-vim-map",
+    "name": "Vim Map",
     "version": "6.1.4",
     "minAppVersion": "1.11.4",
-    "description": "An interactive map view.",
+    "description": "An interactive map view with keyboard-first, vim-like navigation.",
+    "author": "Tristan Misko",
+    "authorUrl": "https://github.com/tjmisko",
     "isDesktopOnly": false
 }
